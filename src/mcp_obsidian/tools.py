@@ -387,6 +387,50 @@ class DeleteFileToolHandler(ToolHandler):
            )
        ]
    
+class DeleteFolderToolHandler(ToolHandler):
+   def __init__(self):
+       super().__init__("obsidian_delete_folder")
+
+   def get_tool_description(self):
+       return Tool(
+           name=self.name,
+           description="Delete a folder and all its contents from the vault. Every file under the folder is permanently removed.",
+           inputSchema={
+               "type": "object",
+               "properties": {
+                   "folderpath": {
+                       "type": "string",
+                       "description": "Path to the folder to delete (relative to vault root, no trailing slash)",
+                       "format": "path"
+                   },
+                   "confirm": {
+                       "type": "boolean",
+                       "description": "Confirmation to delete the folder and all its contents (must be true)",
+                       "default": False
+                   }
+               },
+               "required": ["folderpath", "confirm"]
+           }
+       )
+
+   def run_tool(self, args: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+       if "folderpath" not in args:
+           raise RuntimeError("folderpath argument missing in arguments")
+
+       if not args.get("confirm", False):
+           raise RuntimeError("confirm must be set to true to delete a folder")
+
+       api = obsidian.Obsidian(api_key=api_key, host=obsidian_host)
+       deleted = api.delete_folder(args["folderpath"])
+
+       return [
+           TextContent(
+               type="text",
+               text=f"Successfully deleted folder '{args['folderpath']}' ({len(deleted)} files removed)"
+           )
+       ]
+
+
 class ComplexSearchToolHandler(ToolHandler):
    def __init__(self):
        super().__init__("obsidian_complex_search")
@@ -732,5 +776,87 @@ class RecentChangesToolHandler(ToolHandler):
             TextContent(
                 type="text",
                 text=json.dumps(results, indent=2)
+            )
+        ]
+
+
+class MoveFileToolHandler(ToolHandler):
+    def __init__(self):
+        super().__init__("obsidian_move_file")
+
+    def get_tool_description(self):
+        return Tool(
+            name=self.name,
+            description="Move or rename a single file within the vault. The destination path determines both location and name.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "description": "Current path of the file (relative to vault root).",
+                        "format": "path"
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "New path for the file (relative to vault root). Parent folders are created automatically.",
+                        "format": "path"
+                    }
+                },
+                "required": ["source", "destination"]
+            }
+        )
+
+    def run_tool(self, args: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+        if "source" not in args or "destination" not in args:
+            raise RuntimeError("source and destination arguments required")
+
+        api = obsidian.Obsidian(api_key=api_key, host=obsidian_host)
+        api.move_file(args["source"], args["destination"])
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Moved '{args['source']}' → '{args['destination']}'"
+            )
+        ]
+
+
+class MoveFolderToolHandler(ToolHandler):
+    def __init__(self):
+        super().__init__("obsidian_move_folder")
+
+    def get_tool_description(self):
+        return Tool(
+            name=self.name,
+            description="Move or rename a folder and all its contents within the vault. Every file under the source folder is relocated to the destination path.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "description": "Current folder path (relative to vault root, no trailing slash). E.g. 'Work/OldName'.",
+                        "format": "path"
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "New folder path (relative to vault root, no trailing slash). E.g. 'Work/NewName'.",
+                        "format": "path"
+                    }
+                },
+                "required": ["source", "destination"]
+            }
+        )
+
+    def run_tool(self, args: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+        if "source" not in args or "destination" not in args:
+            raise RuntimeError("source and destination arguments required")
+
+        api = obsidian.Obsidian(api_key=api_key, host=obsidian_host)
+        moved = api.move_folder(args["source"], args["destination"])
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Moved folder '{args['source']}' → '{args['destination']}' ({len(moved)} files)"
             )
         ]

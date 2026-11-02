@@ -1,0 +1,15 @@
+# Dependencies and build artifacts
+.venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[oc]
+
+# Environment
+.env
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage

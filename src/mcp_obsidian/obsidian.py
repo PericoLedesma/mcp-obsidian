@@ -203,21 +203,72 @@ class Obsidian():
     
     def delete_file(self, filepath: str) -> Any:
         """Delete a file or directory from the vault.
-        
+
         Args:
             filepath: Path to the file to delete (relative to vault root)
-            
+
         Returns:
             None on success
         """
         url = f"{self.get_base_url()}/vault/{filepath}"
-        
+
         def call_fn():
             response = requests.delete(url, headers=self._get_headers(), verify=self.verify_ssl, timeout=self.timeout)
             response.raise_for_status()
             return None
-            
+
         return self._safe_call(call_fn)
+
+    def move_file(self, source: str, destination: str) -> None:
+        """Move or rename a single file by copying content then deleting the source.
+
+        Args:
+            source: Current path (relative to vault root).
+            destination: New path (relative to vault root). Parent directories
+                are created automatically by the REST API on PUT.
+        """
+        content = self.get_file_contents(source)
+        self.put_content(destination, content)
+        self.delete_file(source)
+
+    def delete_folder(self, folderpath: str) -> list[str]:
+        """Delete all files under a folder path, effectively removing the folder.
+
+        Args:
+            folderpath: Folder path to delete (relative to vault root, no trailing slash).
+
+        Returns:
+            List of deleted file paths.
+        """
+        prefix = folderpath.rstrip("/") + "/"
+        all_files: list[str] = self.list_files_in_vault()
+        to_delete = [f for f in all_files if f.startswith(prefix)]
+        if not to_delete:
+            raise Exception(f"No files found under '{folderpath}' — folder may not exist or is already empty.")
+        for filepath in to_delete:
+            self.delete_file(filepath)
+        return to_delete
+
+    def move_folder(self, source: str, destination: str) -> list[str]:
+        """Move or rename a folder by moving every file inside it.
+
+        Args:
+            source: Current folder path (relative to vault root, no trailing slash).
+            destination: New folder path (relative to vault root, no trailing slash).
+
+        Returns:
+            List of moved file paths (original paths).
+        """
+        prefix = source.rstrip("/") + "/"
+        all_files: list[str] = self.list_files_in_vault()
+        to_move = [f for f in all_files if f.startswith(prefix)]
+        if not to_move:
+            raise Exception(f"No files found under '{source}' — folder may not exist or is empty.")
+        dest_prefix = destination.rstrip("/") + "/"
+        for filepath in to_move:
+            new_path = dest_prefix + filepath[len(prefix):]
+            self.move_file(filepath, new_path)
+        return to_move
     
     def search_json(self, query: dict) -> Any:
         url = f"{self.get_base_url()}/search/"
